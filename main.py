@@ -307,8 +307,15 @@ async def call_gemini_api(prompt_text: str, temperature: float, context: str = "
             # Cấu hình API key cho lần thử này
             genai.configure(api_key=api_key)
 
-            # Thực hiện cuộc gọi API như bình thường
-            model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+            # Danh sách các tên model để thử (theo thứ tự ưu tiên)
+            model_names_to_try = [
+                "gemini-1.5-flash",
+                "gemini-1.5-flash-latest",
+                "models/gemini-1.5-flash",
+                "gemini-1.5-pro",
+                "gemini-pro"
+            ]
+            
             safety_settings = [
                 {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
                 {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -317,11 +324,37 @@ async def call_gemini_api(prompt_text: str, temperature: float, context: str = "
             ]
             generation_config = genai.types.GenerationConfig(temperature=temperature,
                                                              response_mime_type="application/json")
-            response = await model.generate_content_async(
-                prompt_text,
-                generation_config=generation_config,
-                safety_settings=safety_settings
-            )
+            
+            # Thử từng model name cho đến khi tìm được model hoạt động
+            response = None
+            last_model_error = None
+            successful_model = None
+            
+            for model_name in model_names_to_try:
+                try:
+                    model = genai.GenerativeModel(model_name=model_name)
+                    print(f"   Đang thử model: {model_name}")
+                    response = await model.generate_content_async(
+                        prompt_text,
+                        generation_config=generation_config,
+                        safety_settings=safety_settings
+                    )
+                    successful_model = model_name
+                    print(f"   ✅ Model {model_name} hoạt động!")
+                    break
+                except Exception as model_error:
+                    error_str = str(model_error)
+                    # Nếu lỗi 404 hoặc model not found, thử model tiếp theo
+                    if "404" in error_str or "not found" in error_str.lower() or "not supported" in error_str.lower():
+                        last_model_error = model_error
+                        print(f"   ❌ Model {model_name} không khả dụng: {error_str[:150]}")
+                        continue
+                    else:
+                        # Nếu là lỗi khác (không phải 404), ném lỗi ngay
+                        raise
+            
+            if response is None:
+                raise Exception(f"Không tìm thấy model khả dụng sau khi thử {len(model_names_to_try)} models. Lỗi cuối cùng: {str(last_model_error)}")
 
             # Xử lý response thành công
             if not response.parts:
