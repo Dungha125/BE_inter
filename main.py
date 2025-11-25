@@ -308,7 +308,7 @@ async def call_gemini_api(prompt_text: str, temperature: float, context: str = "
             genai.configure(api_key=api_key)
 
             # Thực hiện cuộc gọi API như bình thường
-            model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+            model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
             safety_settings = [
                 {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
                 {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
